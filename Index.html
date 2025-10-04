@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ultimate Greifautomat Simulator</title>
+<style>
+:root{--text:#e6eef8;--accent:#f59e0b}
+body{margin:0;font-family:Arial;background:linear-gradient(180deg,#021028,#07122a);color:var(--text);display:flex;flex-direction:column;align-items:center;padding:10px}
+h1{text-align:center;margin-bottom:10px}
+.container{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;width:100%}
+.panel, .machine{background:rgba(255,255,255,0.03);padding:15px;border-radius:10px;box-shadow:0 8px 20px rgba(0,0,0,0.6)}
+.panel{flex:1 1 320px;max-width:350px}
+.machine{flex:1 1 420px;max-width:450px;position:relative}
+.machine h2{text-align:center;margin:0 0 10px}
+label{display:flex;justify-content:space-between;margin:6px 0}
+input[type=range]{width:60%}
+select{margin-left:5px}
+.glass{height:300px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));border:2px solid rgba(255,255,255,0.04);border-radius:8px;overflow:hidden;position:relative}
+.prizes{position:absolute;left:10px;right:10px;bottom:8px;display:flex;flex-wrap:wrap;gap:8px;padding:8px}
+.prize{border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;user-select:none;text-align:center}
+.claw{width:50px;height:50px;background:linear-gradient(180deg,#333,#111);border-radius:6px;position:absolute;top:0;left:50%;transform:translateX(-50%);transition:transform 0.3s}
+.claw::after{content:'';position:absolute;top:-26px;left:50%;transform:translateX(-50%);width:4px;height:26px;background:linear-gradient(#bbb,#666)}
+.controls{margin-top:10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+button{background:var(--accent);border:none;padding:6px 12px;border-radius:6px;color:#061018;font-weight:600;cursor:pointer}
+.message{margin-top:10px;text-align:center;font-weight:bold}
+.highscore{margin-top:10px;text-align:center;font-size:0.9em;color:#f59e0b}
+</style>
+</head>
+<body>
+
+<h1>Ultimate Greifautomat Simulator</h1>
+
+<div class="container">
+<div class="panel">
+<h2>Einstellungen & Automatenwahl</h2>
+
+<label>Automat wählen:
+<select id="machineSelect">
+<option value="blau" selected>Blau</option>
+<option value="rot">Rot</option>
+<option value="gruen">Grün</option>
+<option value="neon">Neon</option>
+</select></label>
+
+<label>Greifkraft: <input type="range" id="strength" min="10" max="100" value="50"> <span id="strengthVal">50%</span></label>
+<label>Greifgeschwindigkeit: <input type="range" id="speed" min="50" max="500" value="200"> <span id="speedVal">200ms</span></label>
+<label>Seitliche Geschwindigkeit: <input type="range" id="sideSpeed" min="5" max="50" value="20"> <span id="sideSpeedVal">20px</span></label>
+<label>Grund-Gewinnchance: <input type="range" id="winChance" min="0" max="100" value="40"> <span id="winChanceVal">40%</span></label>
+<label>Drop-Chance: <input type="range" id="dropChance" min="0" max="100" value="20"> <span id="dropChanceVal">20%</span></label>
+<label>Spielzeit pro Versuch: <input type="range" id="timeLimit" min="5" max="60" value="30"> <span id="timeLimitVal">30s</span></label>
+<label>Maximale Preise: <input type="range" id="maxPrizes" min="5" max="20" value="12"> <span id="maxPrizesVal">12</span></label>
+<label>Preisgröße:
+<select id="prizeSize">
+<option value="40">Klein</option>
+<option value="50" selected>Mittel</option>
+<option value="60">Groß</option>
+</select></label>
+<label>Kralle Form:
+<select id="clawShape">
+<option value="3">3-Zack</option>
+<option value="4" selected>4-Zack</option>
+<option value="5">5-Zack</option>
+</select></label>
+
+<button id="apply">Einstellungen übernehmen</button>
+<label>Sound: <input type="checkbox" id="soundToggle" checked></label>
+</div>
+
+<div class="machine">
+<h2>Greifautomat</h2>
+<div class="glass" id="glass">
+<div class="prizes" id="prizes"></div>
+<div class="claw" id="claw"></div>
+</div>
+<div class="controls">
+<button id="left">◀</button>
+<button id="down">⇩ Greifen</button>
+<button id="right">▶</button>
+<button id="reset">Neu</button>
+</div>
+<div class="message" id="message"></div>
+<div class="highscore" id="highscore"></div>
+</div>
+</div>
+
+<script>
+const prizesEl=document.getElementById('prizes');
+const claw=document.getElementById('claw');
+const msg=document.getElementById('message');
+const glass=document.getElementById('glass');
+const highscore=document.getElementById('highscore');
+
+const strengthInput=document.getElementById('strength');
+const speedInput=document.getElementById('speed');
+const sideSpeedInput=document.getElementById('sideSpeed');
+const winChanceInput=document.getElementById('winChance');
+const dropChanceInput=document.getElementById('dropChance');
+const timeLimitInput=document.getElementById('timeLimit');
+const maxPrizesInput=document.getElementById('maxPrizes');
+const prizeSizeInput=document.getElementById('prizeSize');
+const clawShapeInput=document.getElementById('clawShape');
+const machineSelectInput=document.getElementById('machineSelect');
+const soundToggle=document.getElementById('soundToggle');
+
+const strengthVal=document.getElementById('strengthVal');
+const speedVal=document.getElementById('speedVal');
+const sideSpeedVal=document.getElementById('sideSpeedVal');
+const winChanceVal=document.getElementById('winChanceVal');
+const dropChanceVal=document.getElementById('dropChanceVal');
+const timeLimitVal=document.getElementById('timeLimitVal');
+const maxPrizesVal=document.getElementById('maxPrizesVal');
+
+const leftBtn=document.getElementById('left');
+const rightBtn=document.getElementById('right');
+const downBtn=document.getElementById('down');
+const resetBtn=document.getElementById('reset');
+const applyBtn=document.getElementById('apply');
+
+const prizeIcons=['🧸','🐙','🍬','🎁','🚗','🐱','🍩','💎','🐻','🍫','🍭','🎮'];
+
+let clawX=50;
+let totalWon=0;
+let totalTries=0;
+
+let settings={
+strength:50,
+speed:200,
+sideSpeed:20,
+winChance:40,
+dropChance:20,
+timeLimit:30,
+maxPrizes:12,
+prizeSize:50,
+clawShape:4,
+machineColor:'#081225'
+};
+
+function updateDisplays(){
+strengthVal.textContent=settings.strength+'%';
+speedVal.textContent=settings.speed+'ms';
+sideSpeedVal.textContent=settings.sideSpeed+'px';
+winChanceVal.textContent=settings.winChance+'%';
+dropChanceVal.textContent=settings.dropChance+'%';
+timeLimitVal.textContent=settings.timeLimit+'s';
+maxPrizesVal.textContent=settings.maxPrizes;
+}
+updateDisplays();
+
+function populate(){
+prizesEl.innerHTML='';
+for(let i=0;i<settings.maxPrizes;i++){
+const p=document.createElement('div');
+p.className='prize';
+p.textContent=prizeIcons[Math.floor(Math.random()*prizeIcons.length)];
+p.style.width=settings.prizeSize+'px';
+p.style.height=settings.prizeSize+'px';
+prizesEl.appendChild(p);
+}
+}
+populate();
+
+function updateClaw(){claw.style.transform=`translateX(${clawX}px)`;}
+updateClaw();
+
+leftBtn.addEventListener('click',()=>{clawX=Math.max(clawX-settings.sideSpeed,-150);updateClaw();});
+rightBtn.addEventListener('click',()=>{clawX=Math.min(clawX+settings.sideSpeed,150);updateClaw();});
+
+function playSound(type){
+if(!soundToggle.checked) return;
+const audio=new Audio();
+switch(type){
+case 'grab': audio.src='https://www.soundjay.com/mechanical/sounds/mechanical-click-1.mp3'; break;
+case 'win': audio.src='https://www.soundjay.com/button/sounds/button-16.mp3'; break;
+case 'drop': audio.src='https://www.soundjay.com/button/sounds/button-10.mp3'; break;
+}
+audio.play();
+}
+
+downBtn.addEventListener('click',()=>{
+msg.textContent='Greifen...';
+playSound('grab');
+claw.style.transition=`transform ${settings.speed}ms linear`;
+claw.style.transform=`translateX(${clawX}px) translateY(140px)`;
+setTimeout(()=>{
+const won=Math.random()*100<settings.winChance;
+totalTries++;
+if(won){
+const prizes=Array.from(document.querySelectorAll('.prize'));
+if(prizes.length){
+const idx=Math.floor(Math.random()*prizes.length);
+const drop=Math.random()*100<settings.dropChance;
+const prizeWon=prizes[idx].textContent;
+if(!drop){
+prizes[idx].remove();
+totalWon++;
+msg.textContent=`Du hast ${prizeWon} gewonnen! 🎉`;
+playSound('win');
+}else{
+msg.textContent=`Du hast ${prizeWon} fast gewonnen, aber es ist gefallen 😢`;
+playSound('drop');
+}
+}else{
+msg.textContent='Keine Preise mehr.';
+}
+}else{
+msg.textContent='Leider nichts gefangen.';
+}
+claw.style.transform=`translateX(${clawX}px)`;
+highscore.textContent=`Gesamt gewonnen: ${totalWon} / Versuche: ${totalTries}`;
+},settings.speed);
+});
+
+resetBtn.addEventListener('click',()=>{
+populate();
+msg.textContent='';
+clawX=50;
+updateClaw();
+});
+
+applyBtn.addEventListener('click',()=>{
+settings.strength=parseInt(strengthInput.value);
+settings.speed=parseInt(speedInput.value);
+settings.sideSpeed=parseInt(sideSpeedInput.value);
+settings.winChance=parseInt(winChanceInput.value);
+settings.dropChance=parseInt(dropChanceInput.value);
+settings.timeLimit=parseInt(timeLimitInput.value);
+settings.maxPrizes=parseInt(maxPrizesInput.value);
+settings.prizeSize=parseInt(prizeSizeInput.value);
+settings.clawShape=parseInt(clawShapeInput.value);
+switch(machineSelectInput.value){
+case 'blau':settings.machineColor='#081225';break;
+case 'rot':settings.machineColor='#220811';break;
+case 'gruen':settings.machineColor='#102208';break;
+case 'neon':settings.machineColor='#4400ff';break;
+}
+glass.style.background=settings.machineColor;
+updateDisplays();
+populate();
+});
+
+</script>
+
+</body>
+</html>
